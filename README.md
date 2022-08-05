@@ -1,2 +1,5 @@
-# CDPR-Cable-Failure-Tolerant-Control
-IMM based FTC for cable driven parallel robots
+
+# Cable Failure Tolerant Control
+
+Automated Cable Failure Detection and Failure Tolerant Control using Interactive Multi Model Adaptive Estimation
+
