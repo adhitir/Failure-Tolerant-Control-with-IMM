@@ -34,75 +34,38 @@ classdef fourPRPR < PRPRcommon
                         
       function [theta,l,tau_pos] = joint_state(obj,X,X_dot,theta0,l0,dt,tau_pos_init)
 
-         
-        % New desired position of the end-effector
-        X_new = X + X_dot*dt;
-        
-        % Convert spatial velocity to body velocity
-        phi_e = X(3);
-        pRo = [cos(phi_e) -sin(phi_e); sin(phi_e) cos(phi_e)]; %rot_z
-        p = X(1:2);      
-        Adgpo = [pRo [p(2); -p(1)]; 0 0 1]; 
-        X_dot_b = Adgpo\X_dot;
-        
-        
-        % Desired slider position for optimal manipulability ellipsoid
-        l_des = obj.minimize_objective(X_new,l0,theta0);
-        % Realistic slider input that can be provided 
-        l_dot = (l_des-l0)/dt;
-        
-        l_dot(l_dot>0.05) = 0.05;
-        l_dot(l_dot<-0.05) = -0.05;
+        x1_des = X + X_dot*dt;
 
-        l = l0 + l_dot*dt;
-          
-        % New desired prismatic length
-        Jw = obj.structureMatrix1(X,l);
-        l_p_x = obj.prismatic_length(X,l);
-        
-        l_p_x_dot = -Jw'*X_dot;
-        l_p_x_new = l_p_x + l_p_x_dot*dt;
-        
-        Jw_new = obj.structureMatrix1(X_new,l);
-        %l_p_x_new = obj.prismatic_length(X_new,l);
-        
-        % Is wrench closure?
-%         z = null(Jw_new);
-%         z_bool = z>0;
-%         ceq = sum(z_bool) - 4;
-%         if ceq ~= 0
-%             keyboard
-%         end
-                
+        % Desired slider position for optimal manipulability ellipsoid
+        l_des = obj.minimize_objective(x1_des,l0,theta0);
+
+        % Realistic slider input that can be provided 
+        delta_l = (l_des-l0)/dt;
+        delta_l = max(min(0.005,delta_l),-0.005);
+        l = l0 + delta_l*dt;
+                 
+        Jw = obj.structureMatrix(x1_des,l);
+        l_p_x = obj.prismatic_length(x1_des,l);
+
+
         % Desired tension in the new position
         f_o = [0;0;0];%0.1*[X_dot_b(1:2);0]; % desired wrench on ee is applied in the direction of the desired velocity.
         
         tau_min = [0.5;0.5;0.5;0.5];
         options = optimset('Display', 'off','LargeScale','on','Algorithm','interior-point');
-        tau_pos = fmincon(@obj.minimize_tension, tau_pos_init ,[],[], Jw_new,-f_o, tau_min,[],[],options);
+        tau_pos = fmincon(@obj.minimize_tension, tau_pos_init ,[],[], Jw,-f_o, tau_min,[],[],options);
                
-        k = obj.k0;
+        k0 = obj.k0;
 
-        theta = (k.*l_p_x_new)./(tau_pos + k);
+        theta = (k0.*l_p_x)./(tau_pos + k0);
 
         theta_dot = (theta - theta0)/dt;
 
-        theta_dot(theta_dot>0.05) = 0.05;
-        theta_dot(theta_dot<-0.05) = -0.05;
+        theta_dot(theta_dot>0.05) = 0.1;
+        theta_dot(theta_dot<-0.05) = -0.1;
 
         theta = theta0 + theta_dot*dt;
 
-%         Ks = k./l_p_x_new;
-%         
-%         % Joint angles that will generate the desired pose and cable
-%         % tensions.
-%         theta_des = l_p_x_new - tau_pos./Ks;
-%         
-%         theta =  theta_des;% - 0.5*(theta_des - theta0);
-%         theta(isinf(theta)) = -100;
-%         theta(isnan(theta)) = -100;
-        
-        %theta = l_p_x_new;
       end
     
       function tau = minimize_tension(obj,x)
@@ -159,8 +122,6 @@ classdef fourPRPR < PRPRcommon
 
         function objf = objective_fn(l)
             Jw = obj.structureMatrix(x1i,l);
-%             A = Jw*Jw'; 
-%             objf = -sqrt(det(A));  % MOM
             z = null(Jw);
             if min(z) > 0
                 objf = -min(z)/max(z); %Sensitivity
@@ -175,7 +136,6 @@ classdef fourPRPR < PRPRcommon
             % Ensure positive tensions
             l_p_x = obj.prismatic_length(x1i,l);
             k = obj.k0;
-            %Ks = diag(obj.k0./l_p_x);
             Ks = diag(k./theta);
             c = -Ks*(l_p_x-theta);
             

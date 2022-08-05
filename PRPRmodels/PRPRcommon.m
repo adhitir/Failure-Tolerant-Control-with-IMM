@@ -68,8 +68,6 @@ classdef PRPRcommon
             currentk0(2) = min(obj.k0current(2),obj.k0(2) - min(((obj.k0(2)-0)/obj.t_snap)*t,obj.k0(2)/2));
             currentk0(4) = min(obj.k0current(4),obj.k0(4) - min(((obj.k0(4)-0)/obj.t_snap)*t,obj.k0(4)/2));
         end
-        currentk0
-        obj.t_snap
         obj.k0current = currentk0;
       end
 

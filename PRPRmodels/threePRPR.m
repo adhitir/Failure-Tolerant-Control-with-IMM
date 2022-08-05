@@ -45,41 +45,34 @@ classdef threePRPR < PRPRcommon
         hold off
       end
        
-      function [theta,l_new,tau_pos] = joint_state(obj,X,X_dot,theta0,l0,dt,tau_pos_init)
-          
-        % New desired position of the end-effector
-        X_new = X + X_dot*dt;
-          
-        % Desired slider position for optimal manipulability ellipsoid at
-        % this position
-        l_des = obj.minimize_objective(X_new,l0,theta0);
-        % Realistic slider input that can be provided 
-        l_dot = (l_des-l0)/dt;
-        
-        l_dot(l_dot>0.05) = 0.05;
-        l_dot(l_dot<-0.05) = -0.05;
+      function [theta,l,tau_pos] = joint_state(obj,X,X_dot,theta0,l0,dt,tau_pos_init)
 
-        l_new = l0 + l_dot*dt;
-        
-        % X is the current end-effector state and X_dot is the desired
-        % velocity vector.
- 
-        % New prismatic length
-        Jw_new = obj.structureMatrix1(X_new,l_new);
-        l_p_x_new = obj.prismatic_length(X_new,l_new);      
+        x1_des = X + X_dot*dt;
+          
+        % Desired slider position for optimal manipulability ellipsoid
+        l_des = obj.minimize_objective(x1_des,l0,theta0);
+
+        % Realistic slider input that can be provided 
+        delta_l = (l_des-l0)/dt;
+        delta_l = max(min(0.005,delta_l),-0.005);
+        l = l0 + delta_l;
+                 
+        Jw = obj.structureMatrix(x1_des,l);
+        l_p_x = obj.prismatic_length(x1_des,l);
+           
 
         switch obj.fail
             case 1
-                Jw_new = Jw_new(:,[2,3,4]);
+                Jw = Jw(1:2,[2,3,4]);
                 tau_pos_init = tau_pos_init([2,3,4]);
             case 2
-                Jw_new = Jw_new(:,[1,3,4]);
+                Jw = Jw(1:2,[1,3,4]);
                 tau_pos_init = tau_pos_init([1,3,4]);
             case 3
-                Jw_new = Jw_new(:,[1,2,4]);
+                Jw = Jw(1:2,[1,2,4]);
                 tau_pos_init = tau_pos_init([1,2,4]);
             case 4
-                Jw_new = Jw_new(:,[1,2,3]);
+                Jw = Jw(1:2,[1,2,3]);
                 tau_pos_init = tau_pos_init([1,2,3]);
         end
         
@@ -87,7 +80,7 @@ classdef threePRPR < PRPRcommon
         f_o = [0;0];
         tau_min = [0.5;0.5;0.5];
         options = optimset('Display', 'off','LargeScale','on','Algorithm','interior-point');
-        tau_pos = fmincon(@obj.minimize_tension, tau_pos_init ,[],[], Jw_new(1:2,:),-f_o, tau_min,[],[],options);
+        tau_pos = fmincon(@obj.minimize_tension, tau_pos_init ,[],[], Jw,-f_o, tau_min,[],[],options);
 
         switch obj.fail
             case 1
@@ -103,7 +96,7 @@ classdef threePRPR < PRPRcommon
         k = obj.k0;
         %k(obj.fail) = 0;
 
-        theta = (k.*l_p_x_new)./(tau_pos + k);
+        theta = (k.*l_p_x)./(tau_pos + k);
 
         theta_dot = (theta - theta0)/dt;
 
@@ -112,12 +105,6 @@ classdef threePRPR < PRPRcommon
 
         theta = theta0 + theta_dot*dt;
         
-%         Ks = k./l_p_x_new;
-%         theta = l_p_x_new - tau_pos./Ks;
-%         theta(isinf(theta)) = -100;
-%         theta(isnan(theta)) = -100;
-        
-        %keyboard
       end
       
       function tau = minimize_tension(obj,x)

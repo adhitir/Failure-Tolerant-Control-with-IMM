@@ -36,25 +36,12 @@ classdef twoPRPR < PRPRcommon
       function [theta,l,tau_pos] = joint_state(obj,X,X_dot,theta0,l0,dt,tau_pos_init)
           
         % New desired position of the end-effector
-        X_new = X + X_dot*dt;
-
-        % Determine new slider position
-        phi_e = X(3);
-        pRo = [cos(phi_e) -sin(phi_e); sin(phi_e) cos(phi_e)]; %rot_z
-        p = X(1:2);      
-        
-        Adgpo = [pRo [p(2); -p(1)]; 0 0 1];
-        
-        X_dot_b = Adgpo\X_dot;
+        x1_des = X + X_dot*dt;
 
         Jw = obj.structureMatrix1(X,l0);
         l_p_x = obj.prismatic_length(X,l0);
         [theta1a,theta1b,theta1c,theta1d] = joint_angle(obj,X,l0);
         B = [cos(theta1a) 0 0 0; 0 cos(theta1b) 0 0; 0 0 cos(theta1c) 0; 0 0 0 cos(theta1d)];
-        
-        %l_p_x_dot = -Jw(2,:)'*X_dot_b(1);
-
-        %l_dot = B\Jw(1,:)'*X_dot_b(2);
         
         switch obj.fail
             case 5
@@ -80,12 +67,8 @@ classdef twoPRPR < PRPRcommon
         k = obj.k0;
         switch obj.fail
             case 5
-                %k(1) = 0;
-                %k(3) = 0;
                 tau_pos = [0;0.5;0;0.5];
             case 6
-                %k(2) = 0;
-                %k(4) = 0;
                 tau_pos = [0.5;0;0.5;0];
         end
 
@@ -96,12 +79,7 @@ classdef twoPRPR < PRPRcommon
         theta_dot(theta_dot>0.05) = 0.05;
         theta_dot(theta_dot<-0.05) = -0.05;
 
-        theta = theta0 + theta_dot*dt;
-        
-%         Ks = k./l_p_x_new;
-%         theta = l_p_x_new - tau_pos./Ks;
-%         theta(isinf(theta)) = -100;
-%         theta(isnan(theta)) = -100;        
+        theta = theta0 + theta_dot*dt; 
       
       end
       
